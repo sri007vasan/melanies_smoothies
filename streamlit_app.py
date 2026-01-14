@@ -1,5 +1,6 @@
 # Import python packages
 import streamlit as st
+import requests
 from snowflake.snowpark.functions import col
 
 # Page title
@@ -11,8 +12,9 @@ name_on_order = st.text_input("Name on Smoothie:")
 st.write("The name on your Smoothie will be:", name_on_order)
 
 # Get Snowflake session
-cnx=st.connection("snowflake")
-session=cnx.session()
+cnx = st.connection("snowflake")
+session = cnx.session()
+
 # Load fruit table
 my_dataframe = session.table("smoothies.public.fruit_options")
 
@@ -21,21 +23,26 @@ fruit_list = my_dataframe.select(col("FRUIT_NAME")).to_pandas()["FRUIT_NAME"].to
 
 # Multiselect
 ingredients_list = st.multiselect(
-    "Choose up to 5 ingredients:"
-    ,my_dataframe
-    ,max_selections=5
+    "Choose up to 5 ingredients:",
+    fruit_list,
+    max_selections=5
 )
 
 # Only run if user selected something
 if ingredients_list:
-    ingredients_string = ''
 
+    ingredients_string = ""
     for fruit_chosen in ingredients_list:
-        ingredients_string += fruit_chosen + ' '
+        ingredients_string += fruit_chosen + " "
 
-    smoothieroot_response = requests.get("https://my.smoothieroot.com/api/fruit/watermelon")
-    sf_df = st.dataframe(data=smoothieroot_response.json(), use_container_width=True)
-    # Create submit button
+    # Try API (Snowflake blocks external calls, so fail safely)
+    try:
+        smoothieroot_response = requests.get("https://my.smoothieroot.com/api/fruit/watermelon", timeout=5)
+        st.dataframe(smoothieroot_response.json(), use_container_width=True)
+    except:
+        st.warning("External API not reachable (Snowflake blocks public internet).")
+
+    # Submit button
     time_to_insert = st.button("Submit Order")
 
     if time_to_insert:
@@ -45,8 +52,3 @@ if ingredients_list:
         ).collect()
 
         st.success("Your Smoothie is ordered!", icon="✅")
-import requests
-smoothiefroot_response = requests.get("https://my.smoothieroot.com/api/fruit/watermelon")
-sf_df = st.dataframe(data=smoothieroot_response.json(), use_container_width=True)
-
-
